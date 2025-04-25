@@ -8,7 +8,6 @@ using Microsoft.ML;
 
 namespace Model_Development
 {
-    // Renamed from SalesData to MonthlySalesData
     // Class representing the input data for the model
     public class MonthlySalesData
     {
@@ -17,7 +16,6 @@ namespace Model_Development
         public float TotalRevenue { get; set; } // Total revenue generated for the product in that month
     }
 
-    // Renamed from SalesPrediction to MonthlySalesPrediction
     // Class representing the output predictions of the model
     public class MonthlySalesPrediction
     {
@@ -29,17 +27,17 @@ namespace Model_Development
     {
         // Path to the training data file
         static string trainFilePath = "C:\\Users\\harsh\\OneDrive\\Desktop\\Model_Development\\Dataset\\train.csv";
+        static string modelFilePath = "trained_model.zip";  // Path where the trained model will be saved
 
-        public static void predict()
+        // Method to train the model and save it to a file
+        public static void TrainAndSaveModel()
         {
-            // Creating the ML context, which is the starting point for all ML.NET operations
             var mlContext = new MLContext();
 
             // Informing the user that data loading and preparation is starting
             Console.WriteLine("📊 Loading and preparing training data...");
 
             // STEP 1: Load and preprocess training data
-            // Reading the CSV file, skipping the header, and parsing the data line by line
             var rawData = File.ReadAllLines(trainFilePath)
                 .Skip(1)  // Skipping the header row
                 .Select(line =>
@@ -75,11 +73,38 @@ namespace Model_Development
             var model = pipeline.Fit(trainingData);  // Training the model on the prepared data
             Console.WriteLine("✅ Model training complete.\n");
 
-            // STEP 4: Get unique product categories
-            var productCategories = rawData.Select(r => r.ProductCategory).Distinct().ToList();  // Getting the unique product categories
+            // STEP 4: Save the model to a file
+            Console.WriteLine($"📦 Saving the model to {modelFilePath}...");
+            mlContext.Model.Save(model, trainingData.Schema, modelFilePath);
+            Console.WriteLine("✅ Model saved successfully.\n");
+        }
 
-            // STEP 5: Predict revenue for each category in a given month
-            var predictionEngine = mlContext.Model.CreatePredictionEngine<MonthlySalesData, MonthlySalesPrediction>(model);  // Creating a prediction engine
+        // Method to load the trained model and make predictions
+        public static void predict()
+        {
+            var mlContext = new MLContext();
+
+            // Load the trained model from file
+            var model = mlContext.Model.Load(modelFilePath, out var modelInputSchema);
+            Console.WriteLine("✅ Model loaded.\n");
+
+            // Get unique product categories from the training data
+            var rawData = File.ReadAllLines(trainFilePath)
+                .Skip(1)
+                .Select(line =>
+                {
+                    var parts = line.Split(',');
+                    return new MonthlySalesData
+                    {
+                        Month = DateTime.Parse(parts[0]).ToString("MM"),
+                        ProductCategory = parts[1]
+                    };
+                })
+                .ToList();
+            var productCategories = rawData.Select(r => r.ProductCategory).Distinct().ToList();
+
+            // Create a prediction engine from the loaded model
+            var predictionEngine = mlContext.Model.CreatePredictionEngine<MonthlySalesData, MonthlySalesPrediction>(model);
 
             string monthToPredict = "05"; // Setting the month to predict as May
 
@@ -96,7 +121,7 @@ namespace Model_Development
 
                 // Making a prediction using the prediction engine
                 var prediction = predictionEngine.Predict(input);
-                Console.WriteLine($"📊 Predicted revenue for '{category}' in {monthToPredict}: ₹{prediction.PredictedRevenue:F2}");  // Displaying the predicted revenue
+                Console.WriteLine($"📊 Predicted revenue for '{category}' in {monthToPredict}: ${prediction.PredictedRevenue:F2}");  // Displaying the predicted revenue
             }
         }
     }

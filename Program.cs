@@ -8,7 +8,8 @@ class Program
 {
     static void Main(string[] args)
     {
-        PredictBestCategory.predict();
-        //regression.predict();
+        //PredictBestCategory.predict();
+        regression.TrainAndSaveModel();
+        regression.predict();
     }
 }
